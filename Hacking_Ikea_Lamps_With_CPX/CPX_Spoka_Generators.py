@@ -2,10 +2,6 @@ import time
 
 from adafruit_circuitplayground.express import cpx
 
-
-# pylint: disable=stop-iteration-return
-
-
 def wheel(pos):
     # Input a value 0 to 255 to get a color value.
     # The colours are a transition r - g - b - back to r.
@@ -19,55 +15,54 @@ def wheel(pos):
     pos -= 170
     return int(pos * 3), 0, int(255 - (pos * 3))
 
+class ColorSequence:
+    def __init__(self, colors):
+        self.colors = colors
+        self.index = 0
 
-def cycle_sequence(seq):
-    while True:
-        for elem in seq:
-            yield elem
+    def advance(self):
+        cpx.pixels.fill(wheel(colors[self.index % 256]))
+        self.index += 1
 
+patterns = [
+    ColorSequence(range(256)),  # rainbow_cycle
+    ColorSequence([0]),  # red
+    ColorSequence([10]),  # orange
+    ColorSequence([30]),  # yellow
+    ColorSequence([85]),  # green
+    ColorSequence([137]),  # cyan
+    ColorSequence([170]),  # blue
+    ColorSequence([213]),  # purple
+    ColorSequence([0, 10, 30, 85, 137, 170, 213]),  # party mode
+]
 
-def rainbow_lamp(seq):
-    g = cycle_sequence(seq)
-    while True:
-        cpx.pixels.fill(wheel(next(g)))
-        yield
-
-
-color_sequences = cycle_sequence([
-    range(256),  # rainbow_cycle
-    [0],  # red
-    [10],  # orange
-    [30],  # yellow
-    [85],  # green
-    [137],  # cyan
-    [170],  # blue
-    [213],  # purple
-    [0, 10, 30, 85, 137, 170, 213],  # party mode
-])
-
-heart_rates = cycle_sequence([0, 0.5, 1.0])
+heart_rates = [0, 0.5, 1.0]
 
 heart_rate = 0
 last_heart_beat = time.monotonic()
 next_heart_beat = last_heart_beat + heart_rate
 
-rainbow = None
+pattern = None
 
 cpx.detect_taps = 2
 cpx.pixels.brightness = 0.2
 
+i = 0
+current_speed_index = 0
 while True:
     now = time.monotonic()
 
-    if cpx.tapped or rainbow is None:
-        rainbow = rainbow_lamp(next(color_sequences))
+    if cpx.tapped or pattern is None:
+        pattern = patterns[i % len(patterns)]
+        i += 1
 
     if cpx.shake(shake_threshold=20):
-        heart_rate = next(heart_rates)
+        current_speed_index += 1
+        heart_rate = heart_rates[current_speed_index % len(heart_rates)]
         last_heart_beat = now
         next_heart_beat = last_heart_beat + heart_rate
 
     if now >= next_heart_beat:
-        next(rainbow)
+        pattern.advance()
         last_heart_beat = now
         next_heart_beat = last_heart_beat + heart_rate
